@@ -1,0 +1,27 @@
+# Local Python environments
+.venv/
+.venv-*/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Python and notebook caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Raw and processed datasets
+/data/
+/processed/
+
+# Generated model checkpoints and binary experiment outputs
+/results/*.pt
+/results/*.pth
+/results/*.npz
+/results/*.log
+/results/*.pid

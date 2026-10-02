@@ -1,0 +1,38 @@
+{
+  "protocol": "v2",
+  "train_graphs_checked": 2875,
+  "checkpoint_sha256": "61ad080f0823ed5728b6b63478497593096d3fae0eff5be8565465ff9dd06504",
+  "identity_features_edges_logits_predictions": "passed",
+  "monotonic_doses_and_unchanged_non_targets": "passed",
+  "spatial_concept": "spatial_distance",
+  "concepts": {
+    "cell_size": {
+      "index": 23,
+      "feature": "area",
+      "graph_mean_q20": 36.7656603031603,
+      "graph_mean_q80": 55.60152637399993,
+      "max_error_against_prior_profiling": 2.842170943040401e-14
+    },
+    "cell_shape": {
+      "index": 27,
+      "feature": "circularity",
+      "graph_mean_q20": 0.8726265298877844,
+      "graph_mean_q80": 0.9264207573541922,
+      "max_error_against_prior_profiling": 1.1102230246251565e-16
+    },
+    "cell_intensity": {
+      "index": 90,
+      "feature": "mean_intensity_gray_scale",
+      "graph_mean_q20": 76.2846629254822,
+      "graph_mean_q80": 106.31565969358904,
+      "max_error_against_prior_profiling": 2.842170943040401e-14
+    },
+    "cell_texture": {
+      "index": 55,
+      "feature": "mean_contrast",
+      "graph_mean_q20": 0.0001231852940495843,
+      "graph_mean_q80": 0.00019532637625999425,
+      "max_error_against_prior_profiling": 9.993633524885137e-17
+    }
+  }
+}

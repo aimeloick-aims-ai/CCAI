@@ -1,0 +1,9 @@
+{
+  "prototype_high_rho_pass": true,
+  "correction_pass": true,
+  "error_pass": true,
+  "independent_control_pass": false,
+  "pilot_go": false,
+  "paper_go": false,
+  "reason": "Pilot uses fixed graph pooling and oracle readouts, not trained GNN architectures."
+}
