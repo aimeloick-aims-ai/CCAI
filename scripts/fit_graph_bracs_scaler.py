@@ -34,7 +34,20 @@ def resolve_graph_path(graph_path):
 
 def main():
 
+    global TRAIN_IDS, OUTPUT
+    import argparse
+
+    _ap = argparse.ArgumentParser()
+    _ap.add_argument("--train-csv", default=str(TRAIN_IDS))
+    _ap.add_argument("--output", default=str(OUTPUT))
+    _a = _ap.parse_args()
+    TRAIN_IDS, OUTPUT = Path(_a.train_csv), Path(_a.output)
+    if OUTPUT.exists():
+        raise SystemExit(f"Refusing to overwrite {OUTPUT}")
+
     df = pd.read_csv(TRAIN_IDS)
+    if df.empty or df.sample_id.duplicated().any():
+        raise ValueError("Training IDs must be nonempty and unique")
 
     print("==========================================")
     print("GRAPH-BRACS TRAIN-ONLY SCALER")
@@ -69,6 +82,7 @@ def main():
         graph = torch.load(
             path,
             weights_only=False,
+            map_location="cpu",
         )
 
         x = (
@@ -94,6 +108,8 @@ def main():
             raise ValueError(
                 f"Invalid x shape in {path}: {x.shape}"
             )
+        if not np.isfinite(x).all() or not np.isfinite(edge_attr).all():
+            raise ValueError(f"Nonfinite features in {path}")
 
         if feature_dim is None:
 
@@ -162,6 +178,8 @@ def main():
     # Compute node statistics
     # ---------------------------------------------
 
+    if not x_count or not edge_count:
+        raise ValueError("Scaler requires nonempty nodes and edges")
     x_mean = x_sum / x_count
 
     x_var = (
@@ -221,6 +239,7 @@ def main():
 
     np.savez(
         OUTPUT,
+        train_ids=df.sample_id.to_numpy(dtype=str),
         x_mean=x_mean,
         x_std=x_std,
         edge_mean=np.array(

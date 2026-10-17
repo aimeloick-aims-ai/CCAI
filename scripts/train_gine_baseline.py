@@ -1,12 +1,15 @@
 from pathlib import Path
 import copy
 import random
+import hashlib
+import json
 
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from concept_audit_v3.integrity import validate_splits
 
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
@@ -512,7 +515,39 @@ def run_epoch(
 # MAIN
 # ============================================================
 
+def parse_args():
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Train the Graph-BRACS GINE baseline")
+    ap.add_argument("--seed", type=int, default=SEED)
+    ap.add_argument("--train-csv", default=str(TRAIN_CSV))
+    ap.add_argument("--val-csv", default=str(VAL_CSV))
+    ap.add_argument("--scaler", default=str(SCALER_PATH))
+    ap.add_argument("--output", default=str(OUTPUT_PATH))
+    ap.add_argument("--test-csv", help="Explicit internal holdout; not the dataset-supplied test")
+    ap.add_argument("--epochs", type=int, default=MAX_EPOCHS)
+    ap.add_argument("--patience", type=int, default=PATIENCE)
+    ap.add_argument("--batch-size", type=int, default=BATCH_SIZE)
+    ap.add_argument("--threads", type=int, default=2)
+    ap.add_argument("--hidden-dim", type=int, default=HIDDEN_DIM)
+    return ap.parse_args()
+
+
 def main():
+
+    global SEED, TRAIN_CSV, VAL_CSV, SCALER_PATH, OUTPUT_PATH, MAX_EPOCHS, PATIENCE, BATCH_SIZE, HIDDEN_DIM
+    _a = parse_args()
+    protocol_manifest = Path(_a.train_csv).parent / "split_manifest.json"
+    experiment_protocol = (json.loads(protocol_manifest.read_text())["protocol"] if protocol_manifest.exists()
+                           else "internal_grouped_exploratory" if _a.test_csv else "dataset_supplied_test")
+    SEED, TRAIN_CSV, VAL_CSV = _a.seed, Path(_a.train_csv), Path(_a.val_csv)
+    SCALER_PATH, OUTPUT_PATH = Path(_a.scaler), Path(_a.output)
+    MAX_EPOCHS, PATIENCE, BATCH_SIZE, HIDDEN_DIM = _a.epochs, _a.patience, _a.batch_size, _a.hidden_dim
+    if min(MAX_EPOCHS, PATIENCE, BATCH_SIZE, HIDDEN_DIM, _a.threads) < 1:
+        raise ValueError("Epochs, patience, batch size, hidden dimension and threads must be positive")
+    torch.set_num_threads(_a.threads)
+    if OUTPUT_PATH.exists():
+        raise SystemExit(f"Refusing to overwrite {OUTPUT_PATH}")
 
     set_seed(SEED)
 
@@ -551,69 +586,19 @@ def main():
     test_df = metadata_df[
         metadata_df["split"] == "test"
     ].copy()
+    if _a.test_csv:
+        test_df = pd.read_csv(_a.test_csv)
+    validate_splits({"train": train_df, "validation": val_df, "test": test_df})
 
     # ========================================================
     # VERIFY SPLITS
     # ========================================================
 
-    if len(train_df) != 2875:
-
-        raise ValueError(
-            f"Expected 2875 training graphs, "
-            f"found {len(train_df)}"
-        )
-
-    if len(val_df) != 719:
-
-        raise ValueError(
-            f"Expected 719 validation graphs, "
-            f"found {len(val_df)}"
-        )
-
-    if len(test_df) != 899:
-
-        raise ValueError(
-            f"Expected 899 official test graphs, "
-            f"found {len(test_df)}"
-        )
-
-    print()
-    print(
-        f"Train:      {len(train_df):,}"
-    )
-
-    print(
-        f"Validation: {len(val_df):,}"
-    )
-
-    print(
-        f"Test:       {len(test_df):,}"
-    )
-
-    # ========================================================
-    # VERIFY TEST IS THE OFFICIAL TEST
-    # ========================================================
-
-    official_test_ids = set(
-        metadata_df.loc[
-            metadata_df["split"] == "test",
-            "sample_id",
-        ]
-    )
-
-    loaded_test_ids = set(
-        test_df["sample_id"]
-    )
-
-    if official_test_ids != loaded_test_ids:
-
-        raise ValueError(
-            "Official test IDs do not match."
-        )
-
-    print(
-        "Official test set verified: 899 graphs."
-    )
+    for name, frame in [("train", train_df), ("validation", val_df), ("test", test_df)]:
+        if set(frame.label) != set(LABELS):
+            raise ValueError(f"All seven classes are required in {name}")
+        print(f"{name}: {len(frame)} graphs", flush=True)
+    print("Evaluation protocol:", experiment_protocol)
 
     # ========================================================
     # LOAD TRAIN-ONLY SCALER
@@ -622,6 +607,8 @@ def main():
     scaler = np.load(
         SCALER_PATH
     )
+    if "train_ids" not in scaler or set(scaler["train_ids"]) != set(train_df.sample_id):
+        raise ValueError("Scaler training IDs missing or mismatched. Refit it on the specified training CSV.")
 
     x_mean = scaler["x_mean"]
     x_std = scaler["x_std"]
@@ -871,7 +858,7 @@ def main():
             f"train loss {train_metrics['loss']:.4f} | "
             f"train F1 {train_metrics['macro_f1']:.4f} | "
             f"val loss {val_metrics['loss']:.4f} | "
-            f"val F1 {val_metrics['macro_f1']:.4f}"
+            f"val F1 {val_metrics['macro_f1']:.4f}", flush=True
         )
 
         # ----------------------------------------------------
@@ -987,7 +974,7 @@ def main():
 
     print()
     print("==========================================")
-    print("OFFICIAL TEST")
+    print("INTERNAL HOLDOUT" if _a.test_csv else "DATASET-SUPPLIED TEST")
     print("==========================================")
 
     print(
@@ -1053,12 +1040,25 @@ def main():
         "history": history,
 
         "seed": SEED,
+        "train_ids": train_df.sample_id.tolist(),
+        "validation_ids": val_df.sample_id.tolist(),
+        "test_ids": test_df.sample_id.tolist(),
+        "protocol": experiment_protocol,
+        "scaler_train_ids": scaler["train_ids"].tolist(),
+        "split_hashes": {"train": hashlib.sha256(TRAIN_CSV.read_bytes()).hexdigest(),
+                         "validation": hashlib.sha256(VAL_CSV.read_bytes()).hexdigest(),
+                         "test": hashlib.sha256(Path(_a.test_csv or METADATA_CSV).read_bytes()).hexdigest()},
+        "training_arguments": vars(_a),
     }
 
     torch.save(
         checkpoint,
         OUTPUT_PATH,
     )
+    pd.DataFrame(history).to_csv(OUTPUT_PATH.with_suffix(".history.csv"), index=False)
+    summary = {"seed": SEED, "best_epoch": best_epoch, "validation": final_val, "test": final_test,
+               "protocol": checkpoint["protocol"], "split_hashes": checkpoint["split_hashes"]}
+    OUTPUT_PATH.with_suffix(".metrics.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     print()
     print(

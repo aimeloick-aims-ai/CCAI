@@ -1,0 +1,16 @@
+{
+  "source_workbook_sha256": "657799247662296fd021e3615428e392e04c04c0b9d399f6c9378f74fd2436b9",
+  "sheet": "WSI_Information",
+  "slide_column": "WSI Filename",
+  "patient_column": "Patient Id",
+  "partition_column": "Set",
+  "matched_graphs": 4493,
+  "matched_patients": 150,
+  "partition_counts": {
+    "train": 3630,
+    "test": 551,
+    "validation": 312
+  },
+  "patients_crossing_source_partitions": 0,
+  "source_partition_export_sha256": "a0630938638746d51c91047a4c85035872271223403b6766177dc7b8eadd2573"
+}

@@ -20,8 +20,41 @@ __pycache__/
 /processed/
 
 # Generated model checkpoints and binary experiment outputs
+/results/
 /results/*.pt
 /results/*.pth
 /results/*.npz
 /results/*.log
 /results/*.pid
+
+# Local tooling, editors, scratch data, and historical duplicate runs
+.tools/
+.vscode/
+.notebook/
+archive/
+/results/**/*.npz
+/results/audit_v3_grouped_seed42_recheck*/
+/results/audit_v3_summary*/
+/Latex/*.aux
+/Latex/*.log
+/Latex/*.out
+/Latex/*.synctex.gz
+/Latex/
+
+# Superseded French exports (an open PDF viewer may keep the file locked)
+/Latex/bilan_graph_bracs.pdf
+/Latex/figures/decodabilite.pdf
+
+# Nested experiment binaries and generated synthetic graph fixtures
+/results/**/*.pt
+/results/**/*.pth
+/results/**/*.log
+/results/synthetic_validation_v2/data/
+/results/synthetic_validation_v2/processed/
+/results/reproducible_run/
+/results/reproducible_patient/
+/results/bracs_source_patient/
+
+# Superseded progress-export compatibility files; research_draft is authoritative
+/Latex/graph_bracs_progress_report.pdf
+/Latex/graph_bracs_progress_report.tex
